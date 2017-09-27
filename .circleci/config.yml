@@ -1,0 +1,64 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/katie
+    docker:
+      - image: gradle:4.0-jdk8
+    steps:
+      - checkout
+      - restore_cache:
+          key: circleci-katie-{{ checksum "build.gradle" }}
+      - run: gradle dependencies
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: circleci-katie-{{ checksum "build.gradle" }}
+      - run: gradle build
+      - run: gradle test
+  gcloud-deploy:
+    docker:
+      - image: google/cloud-sdk:167.0.0
+        environment:
+          PROJECT_NAME: zens-main
+          CLUSTER_NAME: zens-kube
+          CLOUDSDK_COMPUTE_ZONE: europe-west1-d
+          DEBIAN_FRONTEND: noninteractive
+          HELM_INSTALL_DIR: /home/gradle/katie
+          ZENS_NAME: katie
+    working_directory: ~/katie
+    steps:
+      - checkout
+      - setup_remote_docker
+      - deploy:
+          name: Install Docker client
+          command: |
+            set -x
+            VER="17.06.1-ce"
+            curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz
+            tar -xz -C /tmp -f /tmp/docker-$VER.tgz
+            mv /tmp/docker/* /usr/bin
+      - run:
+          name: Build Docker-image
+          command: docker build --tag=gcr.io/zens-main/$ZENS_NAME:$CIRCLE_SHA1 --build-arg JITPACK_TOKEN .
+      - deploy:
+          command: |
+            echo $ACCT_AUTH | base64 --decode -i > ${HOME}/account-auth.json ;
+            gcloud auth activate-service-account --key-file ${HOME}/account-auth.json ;
+            gcloud config set project $PROJECT_NAME ;
+            gcloud --quiet config set container/cluster $CLUSTER_NAME ;
+            gcloud config set compute/zone ${CLOUDSDK_COMPUTE_ZONE} ;
+            gcloud --quiet container clusters get-credentials $CLUSTER_NAME ;
+            curl https://kubernetes-helm.storage.googleapis.com/helm-v2.4.2-linux-amd64.tar.gz | tar xfz -
+            mv linux-amd64/helm .
+            gcloud docker -- push gcr.io/zens-main/$ZENS_NAME:$CIRCLE_SHA1
+            cd deploy/
+            ../helm upgrade $ZENS_NAME $ZENS_NAME --set image.tag=$CIRCLE_SHA1
+
+workflows:
+  version: 2
+  build_and_deploy:
+    jobs:
+      - build
+      - gcloud-deploy:
+          requires:
+            - build
