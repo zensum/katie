@@ -7,7 +7,7 @@ group = 'se.zensum'
 version = '1.0-SNAPSHOT'
 description = 'A service to forward/push HTTP requests to an URL endpoint.'
 
-defaultTasks 'run'
+defaultTasks 'build'
 
 buildscript {
     ext.kotlin_version = '1.1.50'
@@ -56,7 +56,8 @@ dependencies {
     compile 'io.github.microutils:kotlin-logging:1.4.6'
     
     // Project specific dependencies (disabled by default)
-    compile 'com.github.zensum:franz:master-SNAPSHOT'
+    //compile 'com.github.zensum:franz:feature-interfaces-SNAPSHOT:sources'
+    compile 'com.github.zensum:franz:feature-interfaces-SNAPSHOT'
     //compile 'com.github.zensum:server-utilities:master-SNAPSHOT'
     //compile 'com.github.zensum:secret-connector:0.2.1'
     compile 'com.github.zensum:idempotence-connector:0.2.2'
@@ -78,7 +79,7 @@ junitPlatform {
 
 jar {
     manifest {
-        attributes 'Main-Class': "se.zensum.KotlinMainClassKt"
+        attributes 'Main-Class': "se.zensum.katie.MainKt"
     }
 }
 
@@ -135,7 +136,7 @@ artifacts {
 }
 
 task run(type: JavaExec) {
-    main = 'se.zensum.KotlinMainClassKt' //Important that 'Kt' is appended to class name
+    main = "se.zensum.katie.MainKt" //Important that 'Kt' is appended to class name
     classpath = sourceSets.main.runtimeClasspath
 }
 
