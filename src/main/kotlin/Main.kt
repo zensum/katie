@@ -2,11 +2,15 @@ package se.zensum.katie
 
 import franz.JobStatus
 import franz.WorkerBuilder
+import kotlinx.coroutines.experimental.future.await
+import mu.KotlinLogging
 import se.zensum.webhook.PayloadOuterClass
 import java.net.URL
+import java.util.concurrent.CompletableFuture
 
 fun getEnv(e : String, default: String? = null) : String = System.getenv()[e] ?: default ?: throw RuntimeException("Missing environment variable $e and no default value is given.")
 
+private val log = KotlinLogging.logger("main")
 private val routes: Map<String, URL> = readRoutes()
 
 fun main(args: Array<String>) {
@@ -28,17 +32,39 @@ fun main(args: Array<String>) {
 
 fun Payload(bytes: ByteArray): PayloadOuterClass.Payload = PayloadOuterClass.Payload.parseFrom(bytes)
 
-private suspend fun send(url: URL, p: PayloadOuterClass.Payload): Boolean {
+val defaultAcceptedRange: IntRange = 200..400
+
+private suspend fun send(url: URL,
+                         payload: PayloadOuterClass.Payload,
+                         validCodes: Collection<Int> = emptyList(),
+                         validCodesRange: IntRange = defaultAcceptedRange): Boolean {
+    val result: CompletableFuture<Int> = sendAsyncRequest(url, payload)
+    val code: Int = result.await()
+    return acceptCode(code, validCodes, validCodesRange).also { accepted ->
+        if(!accepted)
+            log.error("Got unexpected response $code for request to $url with id ${p.flakeId}")
+    }
+}
+
+private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): CompletableFuture<Int> {
+    val result: CompletableFuture<Int> = CompletableFuture()
     khttp.async.request(
         method = p.method.name,
         headers = toMap(p.headers),
         url = url.toString(),
-        params = TODO("p.parameters"),
+        params = toMap(p.parameters),
         data = p.body,
-        onError = TODO(),
-        onResponse = TODO()
+        onError = {
+            log.error("Request failed to $url with request ${p.flakeId}")
+            result.completeExceptionally(this)
+        },
+        onResponse = { result.complete(this.statusCode) },
+        timeout = 45.0
     )
+    return result
 }
+
+fun acceptCode(code: Int, coll: Collection<Int>, range: IntRange): Boolean = code in coll || code in range
 
 fun toMap(headers: PayloadOuterClass.MultiMap): Map<String, String> {
     return headers.pairList.asSequence()
