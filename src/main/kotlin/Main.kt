@@ -42,7 +42,7 @@ private suspend fun send(url: URL,
     val code: Int = result.await()
     return acceptCode(code, validCodes, validCodesRange).also { accepted ->
         if(!accepted)
-            log.error("Got unexpected response $code for request to $url with id ${p.flakeId}")
+            log.error("Got unexpected response $code for request to $url with id ${payload.flakeId}")
     }
 }
 
