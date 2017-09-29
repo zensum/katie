@@ -25,9 +25,8 @@ jobs:
       # build and push Docker image
       - deploy:
           command: |
-            echo $JITPACK_TOKEN
             TAG=$CIRCLE_SHA1
-            docker build -t zensum/katie:latest -t zensum/katie:$TAG .
+            docker build --build-arg=JITPACK_TOKEN="$JITPACK_TOKEN" -t zensum/katie:latest -t zensum/katie:$TAG .
             docker login -u $HUB_USERNAME -p $HUB_PASSWORD
             docker push zensum/katie:$TAG
             docker push zensum/katie:latest
