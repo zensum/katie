@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: ~/katie
     docker:
-      - image: gradle:4.0-jdk8
+      - image: gradle:4.2-jdk8
     steps:
       - checkout
       - restore_cache:
