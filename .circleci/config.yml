@@ -15,50 +15,31 @@ jobs:
           key: circleci-katie-{{ checksum "build.gradle" }}
       - run: gradle build
       - run: gradle test
-  gcloud-deploy:
+  docker-build:
     docker:
-      - image: google/cloud-sdk:167.0.0
-        environment:
-          PROJECT_NAME: zens-main
-          CLUSTER_NAME: zens-kube
-          CLOUDSDK_COMPUTE_ZONE: europe-west1-d
-          DEBIAN_FRONTEND: noninteractive
-          HELM_INSTALL_DIR: /home/gradle/katie
-          ZENS_NAME: katie
+      - image: docker:17.07.0   # (1)
     working_directory: ~/katie
     steps:
       - checkout
       - setup_remote_docker
-      - deploy:
-          name: Install Docker client
-          command: |
-            set -x
-            VER="17.06.1-ce"
-            curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz
-            tar -xz -C /tmp -f /tmp/docker-$VER.tgz
-            mv /tmp/docker/* /usr/bin
-      - run:
-          name: Build Docker-image
-          command: docker build --tag=gcr.io/zens-main/$ZENS_NAME:$CIRCLE_SHA1 --build-arg JITPACK_TOKEN .
+      # build and push Docker image
       - deploy:
           command: |
-            echo $ACCT_AUTH | base64 --decode -i > ${HOME}/account-auth.json ;
-            gcloud auth activate-service-account --key-file ${HOME}/account-auth.json ;
-            gcloud config set project $PROJECT_NAME ;
-            gcloud --quiet config set container/cluster $CLUSTER_NAME ;
-            gcloud config set compute/zone ${CLOUDSDK_COMPUTE_ZONE} ;
-            gcloud --quiet container clusters get-credentials $CLUSTER_NAME ;
-            curl https://kubernetes-helm.storage.googleapis.com/helm-v2.4.2-linux-amd64.tar.gz | tar xfz -
-            mv linux-amd64/helm .
-            gcloud docker -- push gcr.io/zens-main/$ZENS_NAME:$CIRCLE_SHA1
-            cd deploy/
-            ../helm upgrade $ZENS_NAME $ZENS_NAME --set image.tag=$CIRCLE_SHA1
-
+            TAG=$CIRCLE_SHA1
+            docker build -t zensum/katie:latest -t zensum/katie:$TAG .
+            docker login -u $HUB_USERNAME -p $HUB_PASSWORD
+            docker push zensum/katie:$TAG
+            docker push zensum/katie:latest
 workflows:
   version: 2
-  build_and_deploy:
+  build_and_docker:
     jobs:
-      - build
-      - gcloud-deploy:
+      - build:
+          context: org-global
+      - docker-build:
+          context: org-global
           requires:
             - build
+          filters:
+            branches:
+              only: master
