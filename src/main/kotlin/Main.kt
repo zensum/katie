@@ -34,7 +34,7 @@ fun main(args: Array<String>) {
 
 fun Payload(bytes: ByteArray): PayloadOuterClass.Payload = PayloadOuterClass.Payload.parseFrom(bytes)
 
-val defaultAcceptedRange: IntRange = 200..400
+val defaultAcceptedRange: IntRange = 200..399
 
 private suspend fun send(url: URL,
                          payload: PayloadOuterClass.Payload,
