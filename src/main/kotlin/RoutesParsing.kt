@@ -25,9 +25,13 @@ fun parseTomlConfig(toml: Toml): Map<String, URL> {
 }
 
 fun parseEntry(routeConfig: Toml): Pair<String, URL> {
-    val topic: String = routeConfig.getString("topic")!!
-    val url: URL = URL(routeConfig.getString("url")!!)
+    val topic: String = readOrDie(routeConfig, "topic")
+    val url: URL = URL(readOrDie(routeConfig, "url"))
     return topic to url
+}
+
+private fun readOrDie(config: Toml, key: String): String {
+    return config.getString(key) ?: throw IllegalArgumentException("Missing mandatory key \"$key\" in config")
 }
 
 fun verifyFile(filePath: String): File
