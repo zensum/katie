@@ -4,6 +4,7 @@ import franz.JobStatus
 import franz.WorkerBuilder
 import kotlinx.coroutines.experimental.future.await
 import mu.KotlinLogging
+import se.zensum.idempotenceconnector.IdempotenceStore
 import se.zensum.webhook.PayloadOuterClass
 import java.net.URL
 import java.util.concurrent.CompletableFuture
@@ -12,6 +13,7 @@ fun getEnv(e : String, default: String? = null) : String = System.getenv()[e] ?:
 
 private val log = KotlinLogging.logger("main")
 private val routes: Map<String, URL> = readRoutes()
+private val idempotenceStore = IdempotenceStore("idempotence-store")
 
 fun main(args: Array<String>) {
     WorkerBuilder.ofByteArray
@@ -23,9 +25,9 @@ fun main(args: Array<String>) {
             it
                 .require("URL is not null for topic ($topic)") { url != null }
                 .map { Payload(it.value()) }
-                .advanceIf("Not in idempotence store") { false }
+                .advanceIf("Not in idempotence store") { !idempotenceStore.contains(it.flakeId.toString()) }
                 .execute("Send to $url") { send(url!!, it) }
-                .execute("Write in idempotence store") { false }
+                .execute("Write in idempotence store") { idempotenceStore.put(it.flakeId.toString()) }
                 .end()
         }.start()
 }
