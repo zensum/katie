@@ -13,7 +13,7 @@ fun getEnv(e : String, default: String? = null) : String = System.getenv()[e] ?:
 
 private val log = KotlinLogging.logger("main")
 private val routes: Map<String, URL> = readRoutes()
-private val idempotenceStore = IdempotenceStore("idempotence-store")
+private val idempotenceStore = IdempotenceStore(set = "katie")
 
 fun main(args: Array<String>) {
     WorkerBuilder.ofByteArray
