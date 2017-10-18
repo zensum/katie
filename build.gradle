@@ -68,6 +68,11 @@ dependencies {
 
 junitPlatform {
     platformVersion = junit_platform_version
+    filters {
+        engines {
+            include 'junit-jupiter'
+        }
+    }
 }
 
 jar {
