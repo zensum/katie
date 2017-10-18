@@ -57,7 +57,7 @@ dependencies {
     
     // Project specific dependencies (disabled by default)
     //compile 'com.github.zensum:franz:feature-interfaces-SNAPSHOT:sources'
-    compile 'com.github.zensum:franz:feature-interfaces-SNAPSHOT'
+    compile 'com.github.zensum:franz:a53b63bcac'
     //compile 'com.github.zensum:server-utilities:master-SNAPSHOT'
     //compile 'com.github.zensum:secret-connector:0.2.1'
     compile 'com.github.zensum:idempotence-connector:0.2.2'
