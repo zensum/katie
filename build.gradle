@@ -60,6 +60,7 @@ dependencies {
     compile 'com.github.zensum:franz:a53b63bcac'
     //compile 'com.github.zensum:server-utilities:master-SNAPSHOT'
     //compile 'com.github.zensum:secret-connector:0.2.1'
+    compile 'org.jetbrains.ktor:ktor-core:0.4.0'
     compile 'com.github.zensum:idempotence-connector:0.2.2'
     compile 'com.github.zensum:webhook-proto:0.1.1'
     compile 'com.moandjiezana.toml:toml4j:0.7.2'
