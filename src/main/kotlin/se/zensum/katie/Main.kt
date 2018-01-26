@@ -5,34 +5,29 @@ import franz.ProducerBuilder
 import franz.WorkerBuilder
 import franz.producer.ProduceResult
 import khttp.responses.Response
-import kotlinx.coroutines.experimental.Deferred
-import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.future.await
 import mu.KotlinLogging
 import org.apache.kafka.common.errors.TimeoutException
-import org.jetbrains.ktor.http.HttpMethod
 import org.jetbrains.ktor.http.HttpStatusCode
-import org.jetbrains.ktor.request.ApplicationRequest
-import org.jetbrains.ktor.request.receiveStream
 import se.zensum.idempotenceconnector.IdempotenceStore
 import se.zensum.webhook.PayloadOuterClass
 import java.net.URL
-import java.text.Format
 import java.util.concurrent.CompletableFuture
 
+
 fun getEnv(e: String, default: String? = null): String = System.getenv()[e] ?: default
-?: throw RuntimeException("Missing environment variable $e and no default value is given.")
+    ?: throw RuntimeException("Missing environment variable $e and no default value is given.")
 
 private val logger = KotlinLogging.logger("main")
 private val routes: Map<String, URL> = readRoutes()
+private val KAFKA_HOST: String = getEnv("KAFKA_HOST", "kafka")
 private val idempotenceStore = IdempotenceStore(set = "katie")
-private val producer = ProducerBuilder.ofByteArray
-    .option("client.id", "katie")
-    .create()
+private val producer = ProducerBuilder.ofByteArray.option("bootstrap.servers", KAFKA_HOST)
+    .create().forTopic("test")
 
 fun main(args: Array<String>) {
     WorkerBuilder.ofByteArray
-        .subscribedTo(routes.keys)
+        .subscribedTo("test")
         .groupId("katie")
         .handlePiped {
             val topic: String = it.value?.topic() ?: return@handlePiped JobStatus.PermanentFailure
@@ -55,15 +50,14 @@ private suspend fun send(url: URL,
                          payload: PayloadOuterClass.Payload,
                          validCodes: Collection<Int> = emptyList(),
                          validCodesRange: IntRange = defaultAcceptedRange): Boolean {
-    val result: CompletableFuture<Int> = sendAsyncRequest(url, payload)
-    val code: Int = result.await()
-    return acceptCode(code, validCodes, validCodesRange).also { accepted ->
+    val result: Int = sendAsyncRequest(url, payload)
+    return acceptCode(result, validCodes, validCodesRange).also { accepted ->
         if (!accepted)
-            logger.error("Got unexpected response $code for request to $url with id ${payload.flakeId}")
+            logger.error("Got unexpected se.zensum.katie.createResponse $result for request to $url with id ${payload.flakeId}")
     }
 }
 
-private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): CompletableFuture<Int> {
+private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): Int {
     val requestResult: CompletableFuture<Response> = CompletableFuture()
     khttp.async.request(
         method = p.method.name,
@@ -79,9 +73,15 @@ private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): Co
         timeout = 45.0
     )
     val response: Response = requestResult.await()
-    val kafkaResult: CompletableFuture<Int> = createResponse(response)
-    val createResponse = createResponse(response)
-    return requestResult
+    return when (response.statusCode in defaultAcceptedRange) {
+        true -> writeToKafka(response, p.flakeId)
+        false -> response.statusCode
+    }
+}
+
+private suspend fun writeToKafka(response: Response, id: Long): Int {
+    val body: ByteArray = createResponse(response, id).toByteArray()
+    return writeToKafka(response.url, "test", body, response.statusCode)
 }
 
 fun acceptCode(code: Int, coll: Collection<Int>, range: IntRange): Boolean = code in coll || code in range
@@ -99,32 +99,13 @@ private fun merge(pairs: List<PayloadOuterClass.MultiMap.Pair>): String {
         .joinToString(separator = ", ")
 }
 
-suspend fun createResponse(response: Response): Int {
-    val method = response.request.method
-    val path: String = response.url
-    val body: ByteArray = when (routes.format) {
-        Format.RAW_BODY -> receiveBody(response.request)
-        Format.PROTOBUF -> createPayload(response).toByteArray()
-    }
-
-    return writeToKafka(method, path, "test", body, routing.response)
-}
-
-private fun hasBody(req: ApplicationRequest): Boolean = Integer.parseInt(req.headers["Content-Length"] ?: "0") > 0
-
-private suspend fun receiveBody(req: ApplicationRequest): ByteArray = when (hasBody(req)) {
-    true -> req.call.receiveStream().readBytes(64)
-    false -> ByteArray(0)
-}
-
-private suspend fun writeToKafka(method: HttpMethod, path: String, topic: String, data: ByteArray, successResponse: HttpStatusCode): Int {
-    val summary = "${method.value} $path"
+private suspend fun writeToKafka(path: String, topic: String, data: ByteArray, successResponse: Int): Int {
     return try {
         val metaData: ProduceResult = producer.send(topic, data)
-        logger.info("$summary written to ${metaData.topic()}")
-        successResponse.value
+        logger.info("$path written to ${metaData.topic()}")
+        successResponse
     } catch (e: TimeoutException) {
-        logger.error("Time out when trying to write $summary to $topic")
+        logger.error("Time out when trying to write $path to $topic")
         HttpStatusCode.InternalServerError.value
     }
 }
