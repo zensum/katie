@@ -6,6 +6,7 @@ import franz.WorkerBuilder
 import franz.producer.ProduceResult
 import khttp.responses.Response
 import kotlinx.coroutines.experimental.future.await
+import kotlinx.coroutines.experimental.runBlocking
 import mu.KotlinLogging
 import org.apache.kafka.common.errors.TimeoutException
 import org.jetbrains.ktor.http.HttpStatusCode
@@ -19,27 +20,43 @@ fun getEnv(e: String, default: String? = null): String = System.getenv()[e] ?: d
     ?: throw RuntimeException("Missing environment variable $e and no default value is given.")
 
 private val logger = KotlinLogging.logger("main")
-private val routes: Map<String, URL> = readRoutes()
+private val routes: Map<String, Route> = readRoutes()
 private val KAFKA_HOST: String = getEnv("KAFKA_HOST", "kafka")
 private val idempotenceStore = IdempotenceStore(set = "katie")
 private val producer = ProducerBuilder.ofByteArray.option("bootstrap.servers", KAFKA_HOST)
-    .create().forTopic("test")
+    .create()
 
-fun main(args: Array<String>) {
+fun main(args: Array<String>) = runBlocking {
     WorkerBuilder.ofByteArray
-        .subscribedTo("test")
+        .subscribedTo(routes.keys)
         .groupId("katie")
         .handlePiped {
             val topic: String = it.value?.topic() ?: return@handlePiped JobStatus.PermanentFailure
-            val url: URL? = routes[topic]
+            val offset: Long = it.value?.offset() ?: return@handlePiped JobStatus.PermanentFailure
+            val url: URL? = routes[topic]!!.url
+            val responseTopic: String = routes[topic]!!.repsonseTopic
             it
                 .require("URL is not null for topic ($topic)") { url != null }
                 .map { Payload(it.value()) }
-                .advanceIf("Not in idempotence store") { !idempotenceStore.contains(it.flakeId.toString()) }
-                .execute("Send to $url") { send(url!!, it) }
-                .execute("Write in idempotence store") { idempotenceStore.put(it.flakeId.toString()) }
+                .advanceIf("Not in idempotence store") { checkIdempotenceStore(it, offset) }
+                .execute("Send to $url") { send(url!!, it, responseTopic) }
+                .execute("Write in idempotence store") { writeToIdempotenceStore(it, offset) }
                 .end()
         }.start()
+}
+
+private suspend fun writeToIdempotenceStore(it: PayloadOuterClass.Payload, offset: Long): Boolean {
+    return when (it.repeating) {
+        true -> idempotenceStore.put(it.flakeId.toString() + offset)
+        false -> idempotenceStore.put(it.flakeId.toString())
+    }
+}
+
+private suspend fun checkIdempotenceStore(it: PayloadOuterClass.Payload, offset: Long): Boolean {
+    return when (it.repeating) {
+        true -> !idempotenceStore.contains(it.flakeId.toString() + offset)
+        false -> !idempotenceStore.contains(it.flakeId.toString())
+    }
 }
 
 fun Payload(bytes: ByteArray): PayloadOuterClass.Payload = PayloadOuterClass.Payload.parseFrom(bytes)
@@ -48,16 +65,20 @@ val defaultAcceptedRange: IntRange = 200..399
 
 private suspend fun send(url: URL,
                          payload: PayloadOuterClass.Payload,
+                         responseTopic: String,
                          validCodes: Collection<Int> = emptyList(),
                          validCodesRange: IntRange = defaultAcceptedRange): Boolean {
-    val result: Int = sendAsyncRequest(url, payload)
-    return acceptCode(result, validCodes, validCodesRange).also { accepted ->
+    val requestResult: CompletableFuture<Response> = sendAsyncRequest(url, payload)
+    val response: Response = requestResult.await()
+
+    writeResponseToKafka(responseTopic, response, payload.flakeId)
+    return acceptCode(response.statusCode, validCodes, validCodesRange).also { accepted ->
         if (!accepted)
-            logger.error("Got unexpected se.zensum.katie.createResponse $result for request to $url with id ${payload.flakeId}")
+            logger.error("Got unexpected se.zensum.katie.createResponse ${response.statusCode} for request to $url with repeatingId ${payload.flakeId}")
     }
 }
 
-private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): Int {
+private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): CompletableFuture<Response> {
     val requestResult: CompletableFuture<Response> = CompletableFuture()
     khttp.async.request(
         method = p.method.name,
@@ -72,16 +93,12 @@ private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): In
         onResponse = { requestResult.complete(this) },
         timeout = 45.0
     )
-    val response: Response = requestResult.await()
-    return when (response.statusCode in defaultAcceptedRange) {
-        true -> writeToKafka(response, p.flakeId)
-        false -> response.statusCode
-    }
+    return requestResult
 }
 
-private suspend fun writeToKafka(response: Response, id: Long): Int {
+private suspend fun writeResponseToKafka(topic: String, response: Response, id: Long): Int {
     val body: ByteArray = createResponse(response, id).toByteArray()
-    return writeToKafka(response.url, "test", body, response.statusCode)
+    return writeResponseToKafka(response.url, topic, body, response.statusCode)
 }
 
 fun acceptCode(code: Int, coll: Collection<Int>, range: IntRange): Boolean = code in coll || code in range
@@ -99,7 +116,7 @@ private fun merge(pairs: List<PayloadOuterClass.MultiMap.Pair>): String {
         .joinToString(separator = ", ")
 }
 
-private suspend fun writeToKafka(path: String, topic: String, data: ByteArray, successResponse: Int): Int {
+private suspend fun writeResponseToKafka(path: String, topic: String, data: ByteArray, successResponse: Int): Int {
     return try {
         val metaData: ProduceResult = producer.send(topic, data)
         logger.info("$path written to ${metaData.topic()}")

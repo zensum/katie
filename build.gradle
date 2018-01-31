@@ -10,7 +10,7 @@ description = 'A service to forward/push HTTP requests to an URL endpoint.'
 defaultTasks 'build'
 
 buildscript {
-    ext.kotlin_version = '1.1.51'
+    ext.kotlin_version = '1.2.21'
     ext.jvm_version = '1.8'
     ext.junit_platform_version = '1.0.1'
     repositories {
@@ -57,12 +57,12 @@ dependencies {
     
     // Project specific dependencies (disabled by default)
     //compile 'com.github.zensum:franz:feature-interfaces-SNAPSHOT:sources'
-    compile 'com.github.zensum:franz:a53b63bcac'
+    compile 'com.github.zensum:franz:09667519c'
     //compile 'com.github.zensum:server-utilities:master-SNAPSHOT'
     //compile 'com.github.zensum:secret-connector:0.2.1'
     compile 'org.jetbrains.ktor:ktor-core:0.4.0'
     compile 'com.github.zensum:idempotence-connector:0.2.2'
-    compile 'com.github.zensum:webhook-proto:c42d9e0d5'
+    compile 'com.github.zensum:webhook-proto:43f4f77'
     compile 'com.moandjiezana.toml:toml4j:0.7.2'
     compile 'com.github.jkcclemens:khttp:eab56a27d3'
 }
