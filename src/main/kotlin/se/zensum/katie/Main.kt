@@ -34,7 +34,7 @@ fun main(args: Array<String>) = runBlocking {
             val topic: String = it.value?.topic() ?: return@handlePiped JobStatus.PermanentFailure
             val offset: Long = it.value?.offset() ?: return@handlePiped JobStatus.PermanentFailure
             val url: URL? = routes[topic]!!.url
-            val responseTopic: String = routes[topic]!!.repsonseTopic
+            val responseTopic: String = routes[topic]!!.responseTopic
             it
                 .require("URL is not null for topic ($topic)") { url != null }
                 .map { Payload(it.value()) }

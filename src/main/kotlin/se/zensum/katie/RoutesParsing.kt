@@ -6,7 +6,7 @@ import java.net.URL
 
 private const val ROUTES_FILE = "/etc/config/routes"
 
-data class Route(val topic: String, val url: URL, val repsonseTopic: String)
+data class Route(val topic: String, val url: URL, val responseTopic: String)
 
 fun readRoutes(routesFile: String = getEnv("ROUTES_FILE", ROUTES_FILE)):Map<String, Route> {
     val toml = readTomlFromFile(routesFile)
@@ -28,8 +28,8 @@ fun parseTomlConfig(toml: Toml):  Map<String, Route> {
 fun parseEntry(routeConfig: Toml): Pair<String, Route> {
     val topic: String = readOrDie(routeConfig, "topic")
     val url: URL = URL(readOrDie(routeConfig, "url"))
-    val responseRoute: String = readOrDie(routeConfig, "responseTopic")
-    return Pair(topic, Route(topic, url, responseRoute))
+    val responseTopic: String = readOrDie(routeConfig, "responseTopic")
+    return Pair(topic, Route(topic, url, responseTopic))
 }
 
 private fun readOrDie(config: Toml, key: String): String {
