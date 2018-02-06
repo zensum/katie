@@ -47,7 +47,7 @@ fun main(args: Array<String>) = runBlocking {
 
 private suspend fun writeToIdempotenceStore(it: PayloadOuterClass.Payload, offset: Long): Boolean {
     return when (it.repeating) {
-        true -> idempotenceStore.put(it.flakeId.toString() + offset)
+        true -> idempotenceStore.put("${it.flakeId}:$offset")
         false -> idempotenceStore.put(it.flakeId.toString())
     }
 }
