@@ -54,7 +54,7 @@ private suspend fun writeToIdempotenceStore(it: PayloadOuterClass.Payload, offse
 
 private suspend fun checkIdempotenceStore(it: PayloadOuterClass.Payload, offset: Long): Boolean {
     return when (it.repeating) {
-        true -> !idempotenceStore.contains(it.flakeId.toString() + offset)
+        true -> !idempotenceStore.contains("${it.flakeId}:$offset")
         false -> !idempotenceStore.contains(it.flakeId.toString())
     }
 }
