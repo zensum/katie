@@ -34,7 +34,7 @@ fun main(args: Array<String>) = runBlocking {
             val topic: String = it.value?.topic() ?: return@handlePiped JobStatus.PermanentFailure
             val offset: Long = it.value?.offset() ?: return@handlePiped JobStatus.PermanentFailure
             val url: URL? = routes[topic]!!.url
-            val responseTopic: String = routes[topic]!!.responseTopic
+            val responseTopic: String? = routes[topic]!!.responseTopic
             it
                 .require("URL is not null for topic ($topic)") { url != null }
                 .map { Payload(it.value()) }
@@ -65,13 +65,14 @@ val defaultAcceptedRange: IntRange = 200..399
 
 private suspend fun send(url: URL,
                          payload: PayloadOuterClass.Payload,
-                         responseTopic: String,
+                         responseTopic: String?,
                          validCodes: Collection<Int> = emptyList(),
                          validCodesRange: IntRange = defaultAcceptedRange): Boolean {
     val requestResult: CompletableFuture<Response> = sendAsyncRequest(url, payload)
     val response: Response = requestResult.await()
-
-    writeResponseToKafka(responseTopic, response, payload.flakeId)
+    responseTopic?.let {
+        writeResponseToKafka(responseTopic, response, payload.flakeId)
+    }
     return acceptCode(response.statusCode, validCodes, validCodesRange).also { accepted ->
         if (!accepted)
             logger.error("Got unexpected se.zensum.katie.createResponse ${response.statusCode} for request to $url with repeatingId ${payload.flakeId}")
