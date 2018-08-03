@@ -57,7 +57,8 @@ dependencies {
     
     // Project specific dependencies (disabled by default)
     //compile 'com.github.zensum:franz:feature-interfaces-SNAPSHOT:sources'
-    compile 'com.github.zensum:franz:09667519c'
+    compile 'com.github.zensum:franz:219116e427'
+    compile 'com.github.zensum:franz-sentry-interceptor:560af9904f'
     //compile 'com.github.zensum:server-utilities:master-SNAPSHOT'
     //compile 'com.github.zensum:secret-connector:0.2.1'
     compile 'org.jetbrains.ktor:ktor-core:0.4.0'

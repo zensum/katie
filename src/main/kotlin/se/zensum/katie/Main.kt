@@ -10,6 +10,7 @@ import kotlinx.coroutines.experimental.runBlocking
 import mu.KotlinLogging
 import org.apache.kafka.common.errors.TimeoutException
 import org.jetbrains.ktor.http.HttpStatusCode
+import se.zensum.franzSentry.SentryInterceptor
 import se.zensum.idempotenceconnector.IdempotenceStore
 import se.zensum.webhook.PayloadOuterClass
 import java.net.URL
@@ -30,6 +31,7 @@ fun main(args: Array<String>) = runBlocking {
     WorkerBuilder.ofByteArray
         .subscribedTo(routes.keys)
         .groupId("katie")
+        .install(SentryInterceptor())
         .handlePiped {
             val topic: String = it.value?.topic() ?: return@handlePiped JobStatus.PermanentFailure
             val offset: Long = it.value?.offset() ?: return@handlePiped JobStatus.PermanentFailure
