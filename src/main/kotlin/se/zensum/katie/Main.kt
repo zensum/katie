@@ -4,12 +4,12 @@ import franz.JobStatus
 import franz.ProducerBuilder
 import franz.WorkerBuilder
 import franz.producer.ProduceResult
+import io.ktor.http.HttpStatusCode
 import khttp.responses.Response
 import kotlinx.coroutines.experimental.future.await
 import kotlinx.coroutines.experimental.runBlocking
 import mu.KotlinLogging
 import org.apache.kafka.common.errors.TimeoutException
-import org.jetbrains.ktor.http.HttpStatusCode
 import se.zensum.franzSentry.SentryInterceptor
 import se.zensum.idempotenceconnector.IdempotenceStore
 import se.zensum.webhook.PayloadOuterClass
@@ -70,8 +70,7 @@ private suspend fun send(url: URL,
                          responseTopic: String?,
                          validCodes: Collection<Int> = emptyList(),
                          validCodesRange: IntRange = defaultAcceptedRange): Boolean {
-    val requestResult: CompletableFuture<Response> = sendAsyncRequest(url, payload)
-    val response: Response = requestResult.await()
+    val response: Response = sendAsyncRequest(url, payload)
     responseTopic?.let {
         writeResponseToKafka(responseTopic, response, payload.flakeId)
     }
@@ -81,7 +80,7 @@ private suspend fun send(url: URL,
     }
 }
 
-private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): CompletableFuture<Response> {
+private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): Response {
     val requestResult: CompletableFuture<Response> = CompletableFuture()
     khttp.async.request(
         method = p.method.name,
@@ -96,7 +95,7 @@ private suspend fun sendAsyncRequest(url: URL, p: PayloadOuterClass.Payload): Co
         onResponse = { requestResult.complete(this) },
         timeout = 45.0
     )
-    return requestResult
+    return requestResult.await()
 }
 
 private suspend fun writeResponseToKafka(topic: String, response: Response, id: Long): Int {

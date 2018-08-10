@@ -5,26 +5,24 @@ apply plugin: 'idea'
 
 group = 'se.zensum'
 version = '1.0-SNAPSHOT'
-description = 'A service to forward/push HTTP requests to an URL endpoint.'
+description = 'A service to forward/push HTTP requests to an URL endpoint from Kafka messages'
 
 defaultTasks 'build'
 
 buildscript {
-    ext.kotlin_version = '1.2.21'
+    ext.kotlin_version = '1.2.60'
     ext.jvm_version = '1.8'
-    ext.junit_platform_version = '1.0.1'
+    ext.junit_platform_version = '1.2.0'
     repositories {
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath "org.junit.platform:junit-platform-gradle-plugin:$junit_platform_version"
-        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.0'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.1'
     }
 }
 
-apply plugin: "org.junit.platform.gradle.plugin"
 apply plugin: 'com.github.johnrengelman.shadow'
 
 repositories {
@@ -43,38 +41,29 @@ repositories {
 
 dependencies {
     // Kotlin
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
-    compile 'org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:0.19.1'
-    compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.19.1'
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+    compile 'org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:0.24.0'
+    compile 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.24.0'
     
     // Junit
-    testCompile 'org.junit.jupiter:junit-jupiter-api:5.0.1'
+    testCompile 'org.junit.jupiter:junit-jupiter-api:5.2.0'
     testRuntime "org.junit.platform:junit-platform-launcher:$junit_platform_version"
-    testRuntime 'org.junit.jupiter:junit-jupiter-engine:5.0.1'
+    testRuntime 'org.junit.jupiter:junit-jupiter-engine:5.2.0'
     
     // Logging
-    compile 'io.github.microutils:kotlin-logging:1.4.6'
+    compile 'io.github.microutils:kotlin-logging:1.4.9'
     
     // Project specific dependencies (disabled by default)
     //compile 'com.github.zensum:franz:feature-interfaces-SNAPSHOT:sources'
-    compile 'com.github.zensum:franz:219116e427'
+    compile 'com.github.zensum:franz:219116e42'
     compile 'com.github.zensum:franz-sentry-interceptor:560af9904f'
     //compile 'com.github.zensum:server-utilities:master-SNAPSHOT'
     //compile 'com.github.zensum:secret-connector:0.2.1'
-    compile 'org.jetbrains.ktor:ktor-core:0.4.0'
-    compile 'com.github.zensum:idempotence-connector:0.2.2'
+    compile "io.ktor:ktor-server-netty:0.9.3"
+    compile 'com.github.zensum:idempotence-connector:0.2.4'
     compile 'com.github.zensum:webhook-proto:43f4f77'
     compile 'com.moandjiezana.toml:toml4j:0.7.2'
     compile 'com.github.jkcclemens:khttp:eab56a27d3'
-}
-
-junitPlatform {
-    platformVersion = junit_platform_version
-    filters {
-        engines {
-            include 'junit-jupiter'
-        }
-    }
 }
 
 jar {
@@ -109,6 +98,10 @@ kotlin {
     }
 }
 
+test {
+    useJUnitPlatform()
+}
+
 // Important: All classes containing test cases must match the
 // the regex pattern "^.*Tests?$" to be picked up by the junit-gradle plugin.
 // Test cases can NOT exist outside a class, since then it will not be picked up by Gradle.
@@ -140,14 +133,7 @@ task run(type: JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
 }
 
-task debug(type: JavaExec) {
-    debug true
-    environment "DEBUG", "true"
-    main = project.tasks.run.main
-    classpath = project.tasks.run.classpath
-}
-
 task wrapper(type: Wrapper) {
     description = 'Generates gradlew[.bat] scripts for faster execution'
-    gradleVersion = '4.0'
+    gradleVersion = '4.9'
 }
