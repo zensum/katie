@@ -6,8 +6,8 @@ import khttp.structures.cookie.CookieJar
 import se.zensum.webhook.PayloadOuterClass
 import se.zensum.webhook.ResponseOuterClass
 
-suspend fun createResponse(reponse: Response, requestId: Long ): ResponseOuterClass.Response {
-    return reponse.run {
+fun createResponse(response: Response, requestId: Long ): ResponseOuterClass.Response {
+    return response.run {
         val requestHeaders: Map<String, String> = headers
         val content: ByteArray = content
         val cookies: CookieJar = cookies
