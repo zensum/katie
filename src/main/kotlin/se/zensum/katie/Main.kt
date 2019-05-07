@@ -39,7 +39,16 @@ fun main(args: Array<String>) = runBlocking {
             val responseTopic: String? = routes[topic]!!.responseTopic
             it
                 .require("URL is not null for topic ($topic)") { url != null }
-                .map { Payload(it.value()) }
+                .map {
+                    try {
+                        (Payload(it.value()) to null)
+                    } catch (e: InvalidProtocolBufferException.InvalidWireTypeException) {
+                        Sentry.capture(e)
+                        (null to e)
+                    }
+                }
+                .require("Rejecting broken message") {it.first != null}
+                .map { it.first!! }
                 .advanceIf("Not in idempotence store") { checkIdempotenceStore(it, offset) }
                 .execute("Send to $url") { send(url!!, it, responseTopic) }
                 .execute("Write in idempotence store") { writeToIdempotenceStore(it, offset) }
