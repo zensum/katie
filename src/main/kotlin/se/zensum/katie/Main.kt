@@ -1,10 +1,12 @@
 package se.zensum.katie
 
+import com.google.protobuf.InvalidProtocolBufferException
 import franz.JobStatus
 import franz.ProducerBuilder
 import franz.WorkerBuilder
 import franz.producer.ProduceResult
 import io.ktor.http.HttpStatusCode
+import io.sentry.Sentry
 import khttp.responses.Response
 import kotlinx.coroutines.experimental.future.await
 import kotlinx.coroutines.experimental.runBlocking
