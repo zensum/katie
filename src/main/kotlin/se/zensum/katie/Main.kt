@@ -49,7 +49,7 @@ fun main(args: Array<String>) = runBlocking {
                         (null to e)
                     }
                 }
-                .require("Rejecting broken kafka message") {message ->message?.first != null}
+                .require("Rejecting broken message") {it.first != null}
                 .map { it.first!! }
                 .advanceIf("Not in idempotence store") { checkIdempotenceStore(it, offset) }
                 .execute("Send to $url") { send(url!!, it, responseTopic) }
